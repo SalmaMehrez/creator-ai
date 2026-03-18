@@ -1,6 +1,6 @@
 fastapi==0.128.8
 uvicorn==0.40.0
-huggingface_hub==0.24.5
+huggingface_hub>=0.25.0
 python-dotenv==1.0.1
 starlette==0.52.1
 aiofiles==23.2.1
