@@ -1,19 +1,19 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
-from google import genai
-from google.genai import types
+from huggingface_hub import InferenceClient
 import json
 import ai_service
 import os
-import asyncio
 
 app = FastAPI(title="Creator AI API")
 
-# Configure Gemini with new SDK
-client = genai.Client(api_key=ai_service.GEMINI_API_KEY)
-# We use flash-lite because the standard 2.0-flash is heavily rate-limited on free cloud IPs
-MODEL = "models/gemini-2.0-flash-lite"
+# Configure HuggingFace client
+# Using Llama 3 8B Instruct which is very fast, smart, and consistently available on the free API
+client = InferenceClient(
+    model="meta-llama/Meta-Llama-3-8B-Instruct",
+    token=ai_service.HUGGINGFACE_API_KEY
+)
 
 # CORS middleware for local testing
 from fastapi.middleware.cors import CORSMiddleware
@@ -46,24 +46,23 @@ class VisualsRequest(BaseModel):
 @app.post("/api/chat")
 async def chat_with_ai(request: ChatRequest):
     try:
-        # Build full prompt as a single string
-        prompt = ai_service.INTERVIEW_PROMPT.format(
-            title=request.title,
-            context=request.context
-        )
+        # Convert custom Message format to standard LLM format
+        messages = [
+            {"role": "system", "content": ai_service.INTERVIEW_PROMPT.format(
+                title=request.title,
+                context=request.context
+            )}
+        ]
         for msg in request.history:
-            role_prefix = "Creator:" if msg.role == "user" else "AI:"
-            prompt += f"\n{role_prefix} {msg.content}"
-        prompt += "\nAI:"
+            role = "user" if msg.role == "user" else "assistant"
+            messages.append({"role": role, "content": msg.content})
 
-        # Artificial delay to bypass generic cloud rate limits
-        await asyncio.sleep(2.5)
-
-        response = client.models.generate_content(
-            model=MODEL,
-            contents=prompt
+        # HuggingFace chat completion
+        response = client.chat_completion(
+            messages=messages,
+            max_tokens=500
         )
-        return {"reply": response.text}
+        return {"reply": response.choices[0].message.content}
     except Exception as e:
         print(f"Chat API Error: {e}")
         last_msg = request.history[-1].content if request.history else ""
@@ -72,22 +71,27 @@ async def chat_with_ai(request: ChatRequest):
 @app.post("/api/generate_structure")
 async def generate_structure(request: StructureRequest):
     try:
-        prompt = ai_service.STRUCTURE_PROMPT + "\n\nConversation:\n"
+        messages = [
+            {"role": "system", "content": ai_service.STRUCTURE_PROMPT}
+        ]
         for msg in request.history:
-            role_prefix = "Creator:" if msg.role == "user" else "AI:"
-            prompt += f"{role_prefix} {msg.content}\n"
+            role = "user" if msg.role == "user" else "assistant"
+            messages.append({"role": role, "content": msg.content})
 
-        # Artificial delay to bypass generic cloud rate limits
-        await asyncio.sleep(2.5)
-
-        response = client.models.generate_content(
-            model=MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json"
-            )
+        response = client.chat_completion(
+            messages=messages,
+            max_tokens=1000
         )
-        structure = json.loads(response.text)
+        structure_text = response.choices[0].message.content
+        
+        # HuggingFace returns JSON string but might wrap it in markdown block. Clean it.
+        if "```json" in structure_text:
+            structure_text = structure_text.split("```json")[1].split("```")[0]
+        elif "```" in structure_text:
+             structure_text = structure_text.split("```")[1].split("```")[0]
+        structure_text = structure_text.strip()
+            
+        structure = json.loads(structure_text)
         return {"structure": structure}
         
     except Exception as e:
@@ -109,16 +113,14 @@ async def generate_script(request: ScriptRequest):
         for sec in request.structure:
             structure_text += f"Section: {sec['title']}\nContent: {sec['content']}\n\n"
 
-        prompt = ai_service.SCRIPT_PROMPT + "\n\n" + structure_text
-
-        # Artificial delay to bypass generic cloud rate limits
-        await asyncio.sleep(2.5)
-
-        response = client.models.generate_content(
-            model=MODEL,
-            contents=prompt
+        response = client.chat_completion(
+            messages=[
+                {"role": "system", "content": ai_service.SCRIPT_PROMPT},
+                {"role": "user", "content": structure_text}
+            ],
+            max_tokens=2500
         )
-        return {"script": response.text}
+        return {"script": response.choices[0].message.content}
         
     except Exception as e:
         print(f"Script API Error: {e}")
@@ -130,16 +132,14 @@ async def generate_script(request: ScriptRequest):
 @app.post("/api/generate_visuals")
 async def generate_visuals(request: VisualsRequest):
     try:
-        prompt = ai_service.VISUALS_PROMPT + "\n\nHere is the script:\n\n" + request.script
-
-        # Artificial delay to bypass generic cloud rate limits
-        await asyncio.sleep(2.5)
-
-        response = client.models.generate_content(
-            model=MODEL,
-            contents=prompt
+        response = client.chat_completion(
+            messages=[
+                {"role": "system", "content": ai_service.VISUALS_PROMPT},
+                {"role": "user", "content": request.script}
+            ],
+            max_tokens=3000
         )
-        return {"script_with_visuals": response.text}
+        return {"script_with_visuals": response.choices[0].message.content}
         
     except Exception as e:
         print(f"Visuals API Error: {e}")
