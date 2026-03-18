@@ -9,9 +9,9 @@ import os
 app = FastAPI(title="Creator AI API")
 
 # Configure HuggingFace client
-# Using Llama 3 8B Instruct which is very fast, smart, and consistently available on the free API
+# Using Mistral Nemo which is consistently available on the free API
 client = InferenceClient(
-    model="meta-llama/Meta-Llama-3-8B-Instruct",
+    model="mistralai/Mistral-Nemo-Instruct-2407",
     token=ai_service.HUGGINGFACE_API_KEY
 )
 
