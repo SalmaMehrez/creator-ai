@@ -11,7 +11,7 @@ app = FastAPI(title="Creator AI API")
 # Configure HuggingFace client
 # Using Mistral Nemo which is consistently available on the free API
 client = InferenceClient(
-    model="mistralai/Mistral-Nemo-Instruct-2407",
+    model="Qwen/Qwen2.5-72B-Instruct",
     token=ai_service.HUGGINGFACE_API_KEY
 )
 
