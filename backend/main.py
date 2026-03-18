@@ -11,7 +11,7 @@ app = FastAPI(title="Creator AI API")
 
 # Configure Gemini with new SDK
 client = genai.Client(api_key=ai_service.GEMINI_API_KEY)
-MODEL = "models/gemini-2.0-flash"
+MODEL = "models/gemini-2.0-flash-lite"
 
 # CORS middleware for local testing
 from fastapi.middleware.cors import CORSMiddleware
