@@ -71,36 +71,57 @@ async def chat_with_ai(request: ChatRequest):
 
 @app.post("/api/generate_structure")
 async def generate_structure(request: StructureRequest):
-    try:
-        messages = [
-            {"role": "system", "content": ai_service.STRUCTURE_PROMPT}
-        ]
-        for msg in request.history:
-            role = "user" if msg.role == "user" else "assistant"
-            messages.append({"role": role, "content": msg.content})
+    messages = [
+        {"role": "system", "content": ai_service.STRUCTURE_PROMPT}
+    ]
+    for msg in request.history:
+        role = "user" if msg.role == "user" else "assistant"
+        messages.append({"role": role, "content": msg.content})
 
-        response = client.chat_completion(
-            messages=messages,
-            max_tokens=1000
-        )
-        structure_text = response.choices[0].message.content
-        
-        # HuggingFace returns JSON string but might wrap it in markdown block. Clean it.
-        if "```json" in structure_text:
-            structure_text = structure_text.split("```json")[1].split("```")[0]
-        elif "```" in structure_text:
-             structure_text = structure_text.split("```")[1].split("```")[0]
-        structure_text = structure_text.strip()
-            
-        structure = json.loads(structure_text)
-        return {"structure": structure}
-        
-    except Exception as e:
-        print(f"Structure API Error: {str(e)}")
-        import traceback
-        return {"structure": [
-            {"title": f"API Error: {str(e)}", "content": traceback.format_exc()}
-        ]}
+    # Retry up to 3 times
+    last_error = None
+    for attempt in range(3):
+        try:
+            response = client.chat_completion(
+                messages=messages,
+                max_tokens=1200
+            )
+            raw = response.choices[0].message.content or ""
+            print(f"Structure attempt {attempt+1}, raw length: {len(raw)}")
+
+            # Clean JSON from markdown code blocks if present
+            structure_text = raw.strip()
+            if "```json" in structure_text:
+                structure_text = structure_text.split("```json")[1].split("```")[0].strip()
+            elif "```" in structure_text:
+                structure_text = structure_text.split("```")[1].split("```")[0].strip()
+
+            # Find first [ ... ] JSON array in the response
+            start = structure_text.find("[")
+            end = structure_text.rfind("]")
+            if start != -1 and end != -1:
+                structure_text = structure_text[start:end+1]
+
+            if not structure_text:
+                raise ValueError("Empty response from model")
+
+            structure = json.loads(structure_text)
+            return {"structure": structure}
+
+        except Exception as e:
+            last_error = e
+            print(f"Structure attempt {attempt+1} failed: {str(e)}")
+
+    # Fallback structure if all retries fail
+    print(f"All structure attempts failed: {last_error}")
+    return {"structure": [
+        {"title": "🎬 Hook", "content": "A strong opening statement to grab the viewer's attention immediately."},
+        {"title": "👋 Introduction", "content": "Introduce yourself and the video topic. State what the viewer will learn."},
+        {"title": "📖 Main Point 1", "content": "First key insight or step. Use a concrete example."},
+        {"title": "💡 Main Point 2", "content": "Second key insight. Add a personal story or case study."},
+        {"title": "🔄 Counter-intuitive Twist", "content": "Share a surprising or unexpected angle on the topic."},
+        {"title": "🎯 Conclusion & CTA", "content": "Summarize the key takeaways and give a clear call to action."}
+    ]}
 
 @app.post("/api/generate_script")
 async def generate_script(request: ScriptRequest):
