@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Creator AI - YouTube Script Generator</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@600;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- jsPDF for client-side PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+
+<body>
+    <!-- Top Bar -->
+    <header class="top-bar glass-panel">
+        <div class="logo">
+            <span class="logo-text">Creator <span class="gradient-text">AI</span></span>
+        </div>
+        <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn" aria-label="Toggle Theme">☀️</button>
+    </header>
+
+    <div class="glass-background"></div>
+
+    <div class="container">
+        <!-- Step 0: Landing -->
+        <section id="step-landing" class="active-step card glass-panel center-content">
+            <h1 class="logo-title">Script <span class="gradient-text">Generator</span></h1>
+            <p class="hero-text" style="font-weight: 600; color: var(--primary-color);">Specially designed to create
+                engaging YouTube content.</p>
+            <p class="hero-text">Turn your ideas into captivating scripts in seconds. Discuss your concept, tweak the
+                structure, and let AI generate the perfect script for your video!</p>
+            <button class="btn primary large-btn" onclick="startCreation()">
+                Start Creating
+                <svg viewBox="0 0 24 24" fill="none" class="icon">
+                    <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                </svg>
+            </button>
+        </section>
+
+        <!-- Step 1: Idea Input -->
+        <section id="step-idea" class="hidden-step card glass-panel">
+            <h2>What is your <span class="gradient-text">Video Idea</span>?</h2>
+            <p>Provide a title and a few details to get started.</p>
+
+            <div class="input-group">
+                <label for="video-title">Title or Main Idea</label>
+                <input type="text" id="video-title" placeholder="Ex: How to learn Python in 30 days...">
+            </div>
+
+            <div class="input-group">
+                <label for="video-style">Video Style / Format</label>
+                <select id="video-style" class="custom-select">
+                    <option value="" disabled selected>Choose a style...</option>
+                    <option value="Talking Head">Talking Head (Face to camera)</option>
+                    <option value="Vlog">Vlog (Dynamic & Personal)</option>
+                    <option value="Screencast / Tutorial">Screencast / Tutorial</option>
+                    <option value="Mini-Documentary">Mini-Documentary</option>
+                    <option value="Faceless / Voiceover">Faceless / Voiceover</option>
+                    <option value="Podcast">Podcast Clip / Interview</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+
+
+            <div class="input-group">
+                <label for="video-idea">Video Concept (1 sentence)</label>
+                <input type="text" id="video-idea" placeholder="Briefly describe what this video will be about...">
+            </div>
+
+            <div class="input-group">
+                <label for="video-length">Desired Video Length (minutes)</label>
+                <select id="video-length" class="custom-select">
+                    <option value="" disabled selected>Choose a length...</option>
+                    <option value="1">1 minute</option>
+                    <option value="2">2 minutes</option>
+                    <option value="3">3 minutes</option>
+                    <option value="4">4 minutes</option>
+                    <option value="5">5 minutes</option>
+                    <option value="6">6 minutes</option>
+                    <option value="7">7 minutes</option>
+                    <option value="8">8 minutes</option>
+                    <option value="9">9 minutes</option>
+                    <option value="10">10 minutes</option>
+                    <option value="15">15 minutes</option>
+                    <option value="20">20 minutes</option>
+                    <option value="25">25 minutes</option>
+                    <option value="30">30 minutes</option>
+                    <option value="40">40 minutes</option>
+                    <option value="50">50 minutes</option>
+                    <option value="60">60 minutes</option>
+                </select>
+            </div>
+
+            <div class="input-group">
+                <label for="video-audience">Target Audience</label>
+                <textarea id="video-audience" rows="2"
+                    placeholder="Who is this video for? What are they struggling with?"></textarea>
+            </div>
+
+            <div class="action-buttons space-between">
+                <button class="btn outline" onclick="switchStep('step-idea', 'step-landing')">Back</button>
+                <button class="btn primary" onclick="startIdeation()">Start Discussion <svg viewBox="0 0 24 24"
+                        fill="none" class="icon">
+                        <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                    </svg></button>
+            </div>
+        </section>
+
+        <!-- Step 2: Chat / Ideation -->
+        <section id="step-chat" class="hidden-step card glass-panel">
+            <h2>Creative <span class="gradient-text">Discussion</span></h2>
+            <div class="chat-container" id="chat-box">
+                <!-- Chat messages -->
+            </div>
+            <div class="chat-input flex-row">
+                <input type="text" id="chat-input-text" placeholder="Reply to AI..."
+                    onkeypress="if(event.key === 'Enter') sendChatMessage()">
+                <button class="btn secondary" onclick="sendChatMessage()">Send</button>
+                <button class="btn primary" onclick="proceedToStructure()">View Structure</button>
+            </div>
+        </section>
+
+        <!-- Step 3: Structure Editor -->
+        <section id="step-structure" class="hidden-step card glass-panel">
+            <h2>Proposed <span class="gradient-text">Structure</span></h2>
+            <p>Review, edit, and confirm the outline of your video.</p>
+            <div class="structure-editor" id="structure-editor">
+                <!-- Structure items -->
+            </div>
+            <div class="action-buttons space-between">
+                <button class="btn outline" onclick="switchStep('step-structure', 'step-chat')">Back to
+                    Discussion</button>
+                <button class="btn primary" onclick="generateScript()">Generate Full Script</button>
+            </div>
+        </section>
+
+        <!-- Step 4: Final Script -->
+        <section id="step-script" class="hidden-step card glass-panel">
+            <h2>Your <span class="gradient-text">Script</span></h2>
+            <div class="script-content" id="final-script" contenteditable="true">
+                <!-- Script -->
+            </div>
+            <div class="action-buttons center-actions">
+                <button class="btn outline" onclick="resetApp()">New Script</button>
+                <button class="btn secondary" onclick="addVisualIdeas()" id="btn-visuals">Add Visual Ideas</button>
+                <button class="btn primary" onclick="copyScript()">Copy Script</button>
+                <button class="btn pdf" onclick="exportPDF()" id="btn-pdf">
+                    <svg viewBox="0 0 24 24" fill="none" class="icon"><path d="M12 16l-4-4h3V4h2v8h3l-4 4z" fill="currentColor"/><path d="M4 18h16v2H4v-2z" fill="currentColor"/></svg>
+                    Export PDF
+                </button>
+            </div>
+        </section>
+    </div>
+    <script src="app.js"></script>
+</body>
+
+</html>
