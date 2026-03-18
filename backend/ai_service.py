@@ -45,10 +45,16 @@ Do not include any other text besides the JSON array.
 """
 
 SCRIPT_PROMPT = """
-You are an expert YouTube scriptwriter. Based on the finalized structure provided by the user, write the complete, spoken script for the video.
-The tone should match what was discussed (e.g., dynamic, educational, storytelling).
-IMPORTANT: DO NOT include any visual cues, camera angles, or text in [brackets]. ONLY write the exact words that the creator will speak. 
-Make the dialogue natural, engaging, and optimized for viewer retention.
+You are an expert YouTube scriptwriter. Your ONLY job is to write a COMPLETE, FULL-LENGTH spoken script.
+
+CRITICAL RULES — READ CAREFULLY:
+1. You will be given a TARGET WORD COUNT. You MUST reach it. Do NOT stop before.
+2. Every section must be FULLY written with multiple paragraphs, concrete examples, stories, and transitions.
+3. DO NOT include visual cues, camera directions, or [brackets]. ONLY the spoken words.
+4. DO NOT write "..." or skip content. Write EVERYTHING out in full.
+5. When you finish a section, immediately continue to the next without stopping.
+6. If you feel you are running short, ADD more examples, analogies, and personal anecdotes.
+7. A 10-minute script should feel like a real 10-minute video, not a summary.
 """
 
 VISUALS_PROMPT = """

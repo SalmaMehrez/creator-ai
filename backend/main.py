@@ -110,12 +110,13 @@ async def generate_script(request: ScriptRequest):
             structure_text += f"Section: {sec['title']}\nContent: {sec['content']}\n\n"
 
         # Calculate required word count: ~140 words/minute average speaking pace
-        target_words = int((request.duration_minutes or 5.0) * 140)
+        target_words = int((request.duration_minutes or 5.0) * 150)
         duration_instruction = (
-            f"IMPORTANT: This script is for a {request.duration_minutes}-minute video. "
-            f"You MUST write approximately {target_words} words of spoken dialogue. "
-            f"Do NOT stop early. Keep writing until you reach the full word count. "
-            f"Expand each section with concrete examples, stories, and details to fill the time.\n\n"
+            f"TARGET: {request.duration_minutes}-minute video = {target_words} WORDS MINIMUM.\n"
+            f"You MUST write at least {target_words} words. Count your words as you go.\n"
+            f"Do NOT stop until you have written {target_words} words of spoken dialogue.\n"
+            f"Expand every section with stories, examples, and detailed explanations.\n\n"
+            f"HERE IS THE STRUCTURE TO FOLLOW:\n\n"
         )
 
         response = client.chat_completion(
@@ -123,7 +124,7 @@ async def generate_script(request: ScriptRequest):
                 {"role": "system", "content": ai_service.SCRIPT_PROMPT},
                 {"role": "user", "content": duration_instruction + structure_text}
             ],
-            max_tokens=4000
+            max_tokens=5000
         )
         return {"script": response.choices[0].message.content}
         
