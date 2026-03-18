@@ -1,17 +1,16 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
-from anthropic import Anthropic
+from openai import OpenAI
 import json
 import ai_service
 import os
 
 app = FastAPI(title="Creator AI API")
 
-# Configure Anthropic client
-client = Anthropic(api_key=ai_service.ANTHROPIC_API_KEY)
-# Claude 3.5 Haiku is the best balance of speed and cost
-MODEL = "claude-3-haiku-20240307"
+# Configure OpenAI client
+client = OpenAI(api_key=ai_service.OPENAI_API_KEY)
+MODEL = "gpt-4o-mini"
 
 # CORS middleware for local testing
 from fastapi.middleware.cors import CORSMiddleware
@@ -44,24 +43,24 @@ class VisualsRequest(BaseModel):
 @app.post("/api/chat")
 async def chat_with_ai(request: ChatRequest):
     try:
-        # Build system prompt from ai_service template
-        system_prompt = ai_service.INTERVIEW_PROMPT.format(
-            title=request.title,
-            context=request.context
-        )
-        
-        # Convert custom Message format to Anthropic format
-        messages = []
+        # Convert custom Message format to OpenAI format
+        messages = [
+            {"role": "system", "content": ai_service.INTERVIEW_PROMPT.format(
+                title=request.title,
+                context=request.context
+            )}
+        ]
         for msg in request.history:
-            messages.append({"role": msg.role, "content": msg.content})
+            # OpenAI supports 'user' and 'assistant' roles natively
+            role = "user" if msg.role == "user" else "assistant"
+            messages.append({"role": role, "content": msg.content})
 
-        response = client.messages.create(
+        response = client.chat.completions.create(
             model=MODEL,
-            max_tokens=500,
-            system=system_prompt,
-            messages=messages
+            messages=messages,
+            max_tokens=500
         )
-        return {"reply": response.content[0].text}
+        return {"reply": response.choices[0].message.content}
     except Exception as e:
         print(f"Chat API Error: {e}")
         last_msg = request.history[-1].content if request.history else ""
@@ -70,27 +69,32 @@ async def chat_with_ai(request: ChatRequest):
 @app.post("/api/generate_structure")
 async def generate_structure(request: StructureRequest):
     try:
-        # Convert custom Message format to Anthropic format
-        messages = []
+        # Convert custom Message format to OpenAI format
+        messages = [
+            {"role": "system", "content": ai_service.STRUCTURE_PROMPT}
+        ]
         for msg in request.history:
-            messages.append({"role": msg.role, "content": msg.content})
+            role = "user" if msg.role == "user" else "assistant"
+            messages.append({"role": role, "content": msg.content})
 
-        response = client.messages.create(
+        response = client.chat.completions.create(
             model=MODEL,
+            messages=messages,
             max_tokens=1000,
-            system=ai_service.STRUCTURE_PROMPT,
-            messages=messages
+            response_format={"type": "json_object"}
         )
-        structure_text = response.content[0].text
+        structure_text = response.choices[0].message.content
         
-        # Anthropic might wrap the JSON in markdown blocks, so clean it
-        if structure_text.startswith("```json"):
-            structure_text = structure_text.split("```json")[1]
-        if structure_text.endswith("```"):
-            structure_text = structure_text.rsplit("```", 1)[0]
-        structure_text = structure_text.strip()
-            
-        structure = json.loads(structure_text)
+        # OpenAI returns JSON but might map it uniquely. Make sure we return the array.
+        parsed = json.loads(structure_text)
+        # If it wrapped it in a dict like {"structure": [...]}, extract it
+        if isinstance(parsed, dict) and "structure" in parsed:
+            structure = parsed["structure"]
+        elif isinstance(parsed, dict):
+             # Fallback if returned raw dict
+             structure = [parsed]
+        else:
+            structure = parsed
         return {"structure": structure}
         
     except Exception as e:
@@ -112,15 +116,15 @@ async def generate_script(request: ScriptRequest):
         for sec in request.structure:
             structure_text += f"Section: {sec['title']}\nContent: {sec['content']}\n\n"
 
-        response = client.messages.create(
+        response = client.chat.completions.create(
             model=MODEL,
-            max_tokens=2500,
-            system=ai_service.SCRIPT_PROMPT,
             messages=[
+                {"role": "system", "content": ai_service.SCRIPT_PROMPT},
                 {"role": "user", "content": structure_text}
-            ]
+            ],
+            max_tokens=2500
         )
-        return {"script": response.content[0].text}
+        return {"script": response.choices[0].message.content}
         
     except Exception as e:
         print(f"Script API Error: {e}")
@@ -132,15 +136,15 @@ async def generate_script(request: ScriptRequest):
 @app.post("/api/generate_visuals")
 async def generate_visuals(request: VisualsRequest):
     try:
-        response = client.messages.create(
+        response = client.chat.completions.create(
             model=MODEL,
-            max_tokens=3000,
-            system=ai_service.VISUALS_PROMPT,
             messages=[
+                {"role": "system", "content": ai_service.VISUALS_PROMPT},
                 {"role": "user", "content": request.script}
-            ]
+            ],
+            max_tokens=3000
         )
-        return {"script_with_visuals": response.content[0].text}
+        return {"script_with_visuals": response.choices[0].message.content}
         
     except Exception as e:
         print(f"Visuals API Error: {e}")
