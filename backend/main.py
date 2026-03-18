@@ -39,6 +39,7 @@ class StructureRequest(BaseModel):
     
 class ScriptRequest(BaseModel):
     structure: List[dict]
+    duration_minutes: Optional[float] = 5.0
 
 class VisualsRequest(BaseModel):
     script: str
@@ -108,12 +109,21 @@ async def generate_script(request: ScriptRequest):
         for sec in request.structure:
             structure_text += f"Section: {sec['title']}\nContent: {sec['content']}\n\n"
 
+        # Calculate required word count: ~140 words/minute average speaking pace
+        target_words = int((request.duration_minutes or 5.0) * 140)
+        duration_instruction = (
+            f"IMPORTANT: This script is for a {request.duration_minutes}-minute video. "
+            f"You MUST write approximately {target_words} words of spoken dialogue. "
+            f"Do NOT stop early. Keep writing until you reach the full word count. "
+            f"Expand each section with concrete examples, stories, and details to fill the time.\n\n"
+        )
+
         response = client.chat_completion(
             messages=[
                 {"role": "system", "content": ai_service.SCRIPT_PROMPT},
-                {"role": "user", "content": structure_text}
+                {"role": "user", "content": duration_instruction + structure_text}
             ],
-            max_tokens=2500
+            max_tokens=4000
         )
         return {"script": response.choices[0].message.content}
         

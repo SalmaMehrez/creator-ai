@@ -196,7 +196,8 @@ async function generateScript() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                structure: state.structure
+                structure: state.structure,
+                duration_minutes: parseFloat(state.length) || 5
             })
         });
         const data = await response.json();
