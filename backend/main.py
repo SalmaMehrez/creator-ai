@@ -1,17 +1,17 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
-from google import genai
-from google.genai import types
+from anthropic import Anthropic
 import json
 import ai_service
 import os
 
 app = FastAPI(title="Creator AI API")
 
-# Configure Gemini with new SDK
-client = genai.Client(api_key=ai_service.GEMINI_API_KEY)
-MODEL = "models/gemini-2.0-flash-lite"
+# Configure Anthropic client
+client = Anthropic(api_key=ai_service.ANTHROPIC_API_KEY)
+# Claude 3.5 Haiku is the best balance of speed and cost
+MODEL = "claude-3-haiku-20240307"
 
 # CORS middleware for local testing
 from fastapi.middleware.cors import CORSMiddleware
@@ -44,21 +44,24 @@ class VisualsRequest(BaseModel):
 @app.post("/api/chat")
 async def chat_with_ai(request: ChatRequest):
     try:
-        # Build full prompt as a single string
-        prompt = ai_service.INTERVIEW_PROMPT.format(
+        # Build system prompt from ai_service template
+        system_prompt = ai_service.INTERVIEW_PROMPT.format(
             title=request.title,
             context=request.context
         )
+        
+        # Convert custom Message format to Anthropic format
+        messages = []
         for msg in request.history:
-            role_prefix = "Creator:" if msg.role == "user" else "AI:"
-            prompt += f"\n{role_prefix} {msg.content}"
-        prompt += "\nAI:"
+            messages.append({"role": msg.role, "content": msg.content})
 
-        response = client.models.generate_content(
+        response = client.messages.create(
             model=MODEL,
-            contents=prompt
+            max_tokens=500,
+            system=system_prompt,
+            messages=messages
         )
-        return {"reply": response.text}
+        return {"reply": response.content[0].text}
     except Exception as e:
         print(f"Chat API Error: {e}")
         last_msg = request.history[-1].content if request.history else ""
@@ -67,19 +70,27 @@ async def chat_with_ai(request: ChatRequest):
 @app.post("/api/generate_structure")
 async def generate_structure(request: StructureRequest):
     try:
-        prompt = ai_service.STRUCTURE_PROMPT + "\n\nConversation:\n"
+        # Convert custom Message format to Anthropic format
+        messages = []
         for msg in request.history:
-            role_prefix = "Creator:" if msg.role == "user" else "AI:"
-            prompt += f"{role_prefix} {msg.content}\n"
+            messages.append({"role": msg.role, "content": msg.content})
 
-        response = client.models.generate_content(
+        response = client.messages.create(
             model=MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json"
-            )
+            max_tokens=1000,
+            system=ai_service.STRUCTURE_PROMPT,
+            messages=messages
         )
-        structure = json.loads(response.text)
+        structure_text = response.content[0].text
+        
+        # Anthropic might wrap the JSON in markdown blocks, so clean it
+        if structure_text.startswith("```json"):
+            structure_text = structure_text.split("```json")[1]
+        if structure_text.endswith("```"):
+            structure_text = structure_text.rsplit("```", 1)[0]
+        structure_text = structure_text.strip()
+            
+        structure = json.loads(structure_text)
         return {"structure": structure}
         
     except Exception as e:
@@ -101,13 +112,15 @@ async def generate_script(request: ScriptRequest):
         for sec in request.structure:
             structure_text += f"Section: {sec['title']}\nContent: {sec['content']}\n\n"
 
-        prompt = ai_service.SCRIPT_PROMPT + "\n\n" + structure_text
-
-        response = client.models.generate_content(
+        response = client.messages.create(
             model=MODEL,
-            contents=prompt
+            max_tokens=2500,
+            system=ai_service.SCRIPT_PROMPT,
+            messages=[
+                {"role": "user", "content": structure_text}
+            ]
         )
-        return {"script": response.text}
+        return {"script": response.content[0].text}
         
     except Exception as e:
         print(f"Script API Error: {e}")
@@ -119,13 +132,15 @@ async def generate_script(request: ScriptRequest):
 @app.post("/api/generate_visuals")
 async def generate_visuals(request: VisualsRequest):
     try:
-        prompt = ai_service.VISUALS_PROMPT + "\n\nHere is the script:\n\n" + request.script
-
-        response = client.models.generate_content(
+        response = client.messages.create(
             model=MODEL,
-            contents=prompt
+            max_tokens=3000,
+            system=ai_service.VISUALS_PROMPT,
+            messages=[
+                {"role": "user", "content": request.script}
+            ]
         )
-        return {"script_with_visuals": response.text}
+        return {"script_with_visuals": response.content[0].text}
         
     except Exception as e:
         print(f"Visuals API Error: {e}")
