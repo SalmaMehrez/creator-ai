@@ -64,9 +64,9 @@ async def chat_with_ai(request: ChatRequest):
         )
         return {"reply": response.choices[0].message.content}
     except Exception as e:
-        print(f"Chat API Error: {e}")
-        last_msg = request.history[-1].content if request.history else ""
-        return {"reply": f"Noted! You said: '{last_msg}'. Any more details to add? (API Error)"}
+        print(f"Chat API Error: {str(e)}")
+        import traceback
+        return {"reply": f"API Error Encountered: {str(e)}\n\nTraceback: {traceback.format_exc()}"}
 
 @app.post("/api/generate_structure")
 async def generate_structure(request: StructureRequest):
@@ -95,16 +95,11 @@ async def generate_structure(request: StructureRequest):
         return {"structure": structure}
         
     except Exception as e:
-        print(f"Structure API Error: {e}")
-        return {
-            "structure": [
-                {"title": "🎬 Hook (0:00 - 0:15)", "content": "Strong hook based on discussion."},
-                {"title": "👋 Introduction (0:15 - 0:45)", "content": "Quick intro and video promise."},
-                {"title": "📖 Body - Part 1", "content": "First main point with example."},
-                {"title": "🧠 Body - Part 2", "content": "Second point and deep dive."},
-                {"title": "🎯 Conclusion & CTA", "content": "Final call to action."}
-            ]
-        }
+        print(f"Structure API Error: {str(e)}")
+        import traceback
+        return {"structure": [
+            {"title": f"API Error: {str(e)}", "content": traceback.format_exc()}
+        ]}
 
 @app.post("/api/generate_script")
 async def generate_script(request: ScriptRequest):
@@ -123,11 +118,9 @@ async def generate_script(request: ScriptRequest):
         return {"script": response.choices[0].message.content}
         
     except Exception as e:
-        print(f"Script API Error: {e}")
-        script_text = ""
-        for sec in request.structure:
-            script_text += f"[{sec['title']}]\nGenerated text for {sec['content']}...\n\n"
-        return {"script": script_text}
+        print(f"Script API Error: {str(e)}")
+        import traceback
+        return {"script": f"API Error: {str(e)}\n\nTraceback: {traceback.format_exc()}"}
 
 @app.post("/api/generate_visuals")
 async def generate_visuals(request: VisualsRequest):
